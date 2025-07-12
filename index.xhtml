@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Oscilloscope</title>
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+        #uploadContainer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #uploadBtn {
+            padding: 8px 15px;
+            background-color: #000;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        #uploadBtn:hover {
+            background-color: rgba(0,0,0,0.7);
+        }
+        #fileSupportText {
+            color: #AAAAAA;
+            font-size: 14px;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica', sans-serif;
+            white-space: nowrap;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            display: flex;
+            gap: 8px;
+        }
+        .controlBtn {
+            padding: 8px 15px;
+            background-color: #000;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .controlBtn:hover {
+            background-color: rgba(0,0,0,0.7);
+        }
+        #oscilloscope {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <input id="fileInput" type="file" accept="audio/*" />
+    <div id="uploadContainer">
+        <button id="uploadBtn" type="button" onclick="document.getElementById('fileInput').click()">⬆</button>
+        <span id="fileSupportText">Supports: MP3, FLAC, WAV</span>
+    </div>
+    
+    <div id="controls">
+        <button id="playPauseBtn" class="controlBtn">▶</button>
+        <button id="repeatBtn" class="controlBtn">&#x21BB;</button>
+    </div>
+    
+    <canvas id="oscilloscope"></canvas>
+    
+    <script type="application/javascript">
+    //<![CDATA[
+        const canvas = document.getElementById('oscilloscope');
+        const ctx = canvas.getContext('2d');
+        const fileInput = document.getElementById('fileInput');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const repeatBtn = document.getElementById('repeatBtn');
+        
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let animationId = null;
+        let currentSource = null;
+        let isPlaying = false;
+        let shouldRepeat = false;
+        let audioBuffer = null;
+        let startTime = 0;
+        let pausedAt = 0;
+        let isPausedIntentionally = false;
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        function playAudio(buffer, offset = 0) {
+            if (currentSource) {
+                currentSource.stop();
+                currentSource.disconnect();
+                currentSource = null;
+            }
+            
+            currentSource = audioContext.createBufferSource();
+            currentSource.buffer = buffer;
+            currentSource.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            startTime = audioContext.currentTime - offset;
+            currentSource.start(0, offset);
+            
+            isPausedIntentionally = false;
+            
+            currentSource.onended = function() {
+                if (!isPausedIntentionally) {
+                    if (shouldRepeat) {
+                        playAudio(buffer, 0);
+                    } else {
+                        isPlaying = false;
+                        playPauseBtn.textContent = "▶";
+                        pausedAt = 0;
+                        if (animationId) {
+                            cancelAnimationFrame(animationId);
+                            animationId = null;
+                        }
+                        drawIdleLine();
+                    }
+                }
+            };
+            
+            isPlaying = true;
+            playPauseBtn.textContent = "⏸";
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            draw();
+        }
+        
+        function togglePlayPause() {
+            if (!audioBuffer) return;
+            
+            if (isPlaying) {
+                isPausedIntentionally = true;
+                if (currentSource) {
+                    currentSource.stop();
+                    currentSource.disconnect();
+                    currentSource = null;
+                    pausedAt = audioContext.currentTime - startTime;
+                }
+                isPlaying = false;
+                playPauseBtn.textContent = "▶";
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                drawIdleLine();
+            } else {
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                playAudio(audioBuffer, pausedAt);
+            }
+        }
+        
+        function toggleRepeat() {
+            shouldRepeat = !shouldRepeat;
+            repeatBtn.style.backgroundColor = shouldRepeat ? "#333333" : "#000";
+        }
+        
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        repeatBtn.addEventListener('click', toggleRepeat);
+        
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (audioContext === null) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                audioContext.decodeAudioData(e.target.result)
+                    .then(function(buffer) {
+                        audioBuffer = buffer;
+                        pausedAt = 0;
+                        playAudio(buffer, 0);
+                    })
+                    .catch(function(error) {
+                        console.error("Error decoding audio data:", error);
+                        alert("Could not decode audio file. Please ensure it's a valid audio format (like MP3, WAV, FLAC).");
+                    });
+            };
+            fileReader.onerror = function(error) {
+                console.error("Error reading file:", error);
+                alert("Error reading file. Please try again.");
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+        
+        function draw() {
+            animationId = requestAnimationFrame(draw);
+            
+            if (isPlaying) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            analyser.getByteTimeDomainData(dataArray);
+            
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'lime';
+            ctx.beginPath();
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const sliceWidth = canvas.width / bufferLength;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * canvas.height / 2;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                
+                x += sliceWidth;
+            }
+            
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        function drawIdleLine() {
+            if (isPlaying) return;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'lime';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            drawIdleLine();
+        });
+    //]]>
+    </script>
+</body>
+</html>
