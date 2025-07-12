@@ -1,2 +1,1 @@
-# bluMATRIKZ.github.io
-Audio Oscilloscope
+# Audio Oscilloscope
