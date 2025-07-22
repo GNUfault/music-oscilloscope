@@ -1,0 +1,71 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: black;
+}
+
+#uploadContainer {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#uploadBtn {
+    padding: 8px 15px;
+    background-color: #000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+#uploadBtn:hover {
+    background-color: rgba(0,0,0,0.7);
+}
+
+#fileSupportText {
+    color: #AAAAAA;
+    font-size: 14px;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica', sans-serif;
+    white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+}
+
+.controlBtn {
+    padding: 8px 15px;
+    background-color: #000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.controlBtn:hover {
+    background-color: rgba(0,0,0,0.7);
+}
+
+#oscilloscope {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+#fileInput {
+    display: none;
+}
