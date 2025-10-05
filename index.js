@@ -121,8 +121,8 @@ const canvas = document.getElementById('oscilloscope');
                         playAudio(buffer, 0);
                     })
                     .catch(function(error) {
-                        console.error("Error decoding audio data:", error);
-                        alert("Could not decode audio file. Please ensure it's a valid audio format (like MP3, WAV, FLAC).");
+                        console.error("Audio type not supported:", error);
+                        alert("Audio type not supported.");
                     });
             };
             fileReader.onerror = function(error) {
